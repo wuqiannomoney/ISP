@@ -1,5 +1,5 @@
 function cfg = default_cfg(iso, sensor_name)
-% DEFAULT_CFG  UniPyr-JDE 参数配置（自动加载对应 ISO 的全流标定结果与逐层比例）
+% DEFAULT_CFG  UniPyr-JDE 通用算法参数配置
     if nargin < 1 || isempty(iso), iso = 1600; end
     if nargin < 2 || isempty(sensor_name), sensor_name = 'default_cmos'; end
 
@@ -8,27 +8,18 @@ function cfg = default_cfg(iso, sensor_name)
     [cfg.a_iso, cfg.b_iso, layer_scale_iso] = config.sensor_profile_lut(iso, sensor_name);
 
     cfg.max_3dnr_gain     = 4.0;
-%     cfg.gf_k              = [2.2, 2.8, 3.5];  % eps一般为2-3倍标定噪声方差
-    cfg.layer_noise_scale = layer_scale_iso;  % 每层专属标定系数 [s0, s1, s2]
-% 
-%     cfg.alpha_y           = [1.3, 1.5, 1.6];
-%     cfg.alpha_c           = [1.6, 2.6, 3.2];
-%     cfg.coring_damp_y     = 0.85;
-%     cfg.coring_damp_c     = 0.98;
-    
-    cfg.gf_k          = [8.0, 12.0, 16.0];  % 补偿 s_l^2，让平坦区 eps 真正达到输入方差的 2.5~4 倍
-    cfg.alpha_y       = [2.2, 2.5, 2.8];    % 有效压制 1σ~2σ 亮噪
-    cfg.alpha_c       = [3.5, 5.0, 6.5];    % 重点压制经过 AWB/CCM 放大后的高幅值彩噪
-    cfg.coring_damp_y = 0.92;
-    cfg.coring_damp_c = 0.98;
+    cfg.gf_k              = [15.0, 40.0, 90.0]; % 平滑尺度因子（放行纹理进 D，强边留在 S）
+    cfg.gf_k_detect       = 4.0;                % 通用 2σ 信噪比检测基准 (var = 4*sigma^2 时 a=0.5)
+    cfg.layer_noise_scale = layer_scale_iso;
 
-    % 补齐 ISO 6400 等中低档位拟合为 0 的暗部读出底噪
-%     if cfg.b_iso < 1e-7
-%         cfg.b_iso = 4.836e-5 * (iso / 25600)^2;
-%     end
+    cfg.alpha_y           = [1.5, 1.7, 1.9];    % 配合 flat_boost=1.8 覆盖平坦区 2.4~3.0σ 噪声
+    cfg.alpha_c           = [3.0, 4.5, 6.0];    % 补偿色度相对亮度的 2~3 倍放大率
+    cfg.coring_damp_y     = 0.90;
+    cfg.coring_damp_c     = 0.98;
 
-    cfg.base_gain_l       = [1,1,1];%[1.55, 1.35, 1.18];
+    cfg.base_gain_l       = [1.0,1.0,1.0];%[1.8, 1.5, 1.25];
     cfg.iso_ref           = 100;
-    cfg.usm_l0_strength   = 0;%0.25;
+    cfg.iso_enh_decay     = 0.15;               % 每提升 1 档 EV (ISO翻倍) 的增强衰减系数
+    cfg.usm_l0_strength   = 0.0;
     cfg.usm_max_overshoot = 0.05;
 end

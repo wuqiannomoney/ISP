@@ -1,11 +1,13 @@
-function [S_ycgco, a_struct] = guided_filter_5x5_ycgco(YCgCo, eps_map)
-% 为保证后续rgb增强不偏色，三个通道的eps以及系数a必须相同，
-% 在正交ycocg下，这种条件的ycgco平滑和rgb平滑没有区别，选用ycocg是为了少转换，以及小计算均值
-% GUIDED_FILTER_5X5_YCGCO  直接在 YCgCo 域执行的 5x5 高斯加权共用系数引导滤波
+function [S_ycgco, a_struct] = guided_filter_5x5_ycgco(YCgCo, eps_smooth, eps_detect)
+% GUIDED_FILTER_5X5_YCGCO  平滑阈值(eps_smooth)与结构检测阈值(eps_detect)解耦的 5x5 引导滤波
 %   设计要点:
-%     1) 零多余空间转换，直接在 YCgCo 计算各自局部均值与方差 (总计仅 10 次 gauss5x5)
-%     2) var_edge = var_Y + 0.12*(var_Cg + var_Co): 既对齐亮度标定口径，又保住强纯色边缘
-%     3) Y, Cg, Co 严格共用同一份结构权重 a_shared，保证后续 RGB 增强绝不偏色
+%     1) var_edge 只算一次，零多余卷积开销
+%     2) eps_detect 锁定物理噪声尺度，保住真实纹理的 a_struct 不被大 gf_k 压塌
+%     3) eps_smooth 使用较大 gf_k，让中等纹理顺利进 D 层增强，同时超强边依然留在 S 层防光晕
+
+    if nargin < 3 || isempty(eps_detect)
+        eps_detect = eps_smooth;
+    end
 
     mean_P = cell(1, 3);
     var_P  = cell(1, 3);
@@ -17,17 +19,22 @@ function [S_ycgco, a_struct] = guided_filter_5x5_ycgco(YCgCo, eps_map)
         var_P{c}  = max(mPP - mP .* mP, 0);
     end
 
-    % 联合结构方差
+    % 全彩联合结构方差
     var_edge = var_P{1} + 0.12 * (var_P{2} + var_P{3});
 
-    % 三通道共用同一个权重系数 a_shared ∈ [0, 1]
-    a_shared = var_edge ./ (var_edge + eps_map + 1e-12);
-    a_struct = ops.gauss5x5(a_shared);
+    % 1) 用固定噪声尺度 eps_detect 计算结构置信度图 a_struct
+    a_detect = var_edge ./ (var_edge + eps_detect + 1e-12);
+    a_struct = ops.gauss5x5(a_detect);
 
+    % 2) 用较大平滑尺度 eps_smooth 计算平滑混合权重 a_smooth
+    a_smooth      = var_edge ./ (var_edge + eps_smooth + 1e-12);
+    a_smooth_mean = ops.gauss5x5(a_smooth);
+
+    % 3) 三通道共用平滑权重混合各自原图与局部均值
     S_ycgco = zeros(size(YCgCo));
-    one_minus_a = 1.0 - a_shared;
+    one_minus_a = 1.0 - a_smooth;
     for c = 1:3
         b_c = one_minus_a .* mean_P{c};
-        S_ycgco(:,:,c) = a_struct .* YCgCo(:,:,c) + ops.gauss5x5(b_c);
+        S_ycgco(:,:,c) = a_smooth_mean .* YCgCo(:,:,c) + ops.gauss5x5(b_c);
     end
 end
