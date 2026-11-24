@@ -10,8 +10,8 @@ addpath(jdef_dir);
 % === 1. 配置路径与要测试的场景 ===
 crvd_root = 'D:\mydata\code\matlab\datasets\CRVD';
 sensor_name     = 'crvd_imx385'; % 自动加载 UniPyr-JDE/calibrated_profiles/crvd_imx385.mat
-target_iso      = 3200;          % 指定要测试的 ISO 档位
-target_scene    = 'scene11';      % 指定要测试的场景名 (留空则取第一个匹配的)
+target_iso      = 1600;          % 指定要测试的 ISO 档位
+target_scene    = 'scene5';      % 指定要测试的场景名 (留空则取第一个匹配的)
 target_noisy_id = 3;             % CRVD noisy 序号 (如 noisy0)
 
 % === 2. 模块使能开关（全部设为 false 表示只跑 BLC->Demosaic->AWB/CCM->Gamma->UniPyr-JDE）===
